@@ -8,8 +8,8 @@ plt.rc('axes', titlesize=15)
 plt.rc('axes', labelsize=15)
 
 #Import data
-overall = pd.read_csv("overall.csv")
-alldata = pd.read_csv("Label_matched.csv")
+overall = pd.read_csv("../Results/overall.csv")
+alldata = pd.read_csv("../Data/Indel_curated.csv")
 
 #Add indel type info
 overall['indel'] = overall.apply(lambda row: 'deletion' if row['length_mut'] < row['length_wt'] else 'insertion', axis=1)
@@ -95,19 +95,20 @@ plt.savefig('VEST_boxplot.png')
 
 print(keptlabels['FATHMM-indel'])
 
-plt.figure(figsize=(10,5))
-plt.scatter(keptlabels['FATHMM-indel'], overall['dif_evo'], c=colors)
-plt.ylabel('Dif_evo')
-plt.xlabel('FATHMM-indel')
-plt.legend(handles=handles, loc = "best")
-plt.savefig('FATHMM_evo.png')
+#Not working 
+#plt.figure(figsize=(10,5))
+#plt.scatter(keptlabels['FATHMM-indel'], overall['dif_evo'], c=colors)
+#plt.ylabel('Dif_evo')
+#plt.xlabel('FATHMM-indel')
+#plt.legend(handles=handles, loc = "best")
+#plt.savefig('FATHMM_evo.png')
 
-plt.figure(figsize=(10,5))
-plt.scatter(keptlabels['PROVEAN'],overall['dif_evo'], c=colors)
-plt.ylabel('Dif_evo')
-plt.xlabel('PROVEAN')
-plt.legend(handles=handles, loc = "best")
-plt.savefig('PROVEAN_evo.png')
+#plt.figure(figsize=(10,5))
+#plt.scatter(keptlabels['PROVEAN'],overall['dif_evo'], c=colors)
+#plt.ylabel('Dif_evo')
+#plt.xlabel('PROVEAN')
+#plt.legend(handles=handles, loc = "best")
+#plt.savefig('PROVEAN_evo.png')
 
 
 #identifying the low scoring benign
