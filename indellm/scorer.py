@@ -40,7 +40,13 @@ class Scorer:
         return  vals
     
     @staticmethod
-    def truncate_sequences(wtseq, mutseq, start_position):
+    def truncate_sequences(wtseq, mutseq):
+
+        min_length = min(len(wtseq), len(mutseq))
+    
+        for i in range(min_length):
+            if wtseq[i] != mutseq[i]:
+                start_position = i # index of the first difference
         
         # Compute length
         wt_len = len(wtseq)
@@ -95,8 +101,8 @@ class Scorer:
             # Check if the sequence is too long
             if (len(wtseq) > 1000 or len(mutseq) > 1000) and not self.df["seq_source"][i] == "refseq_NM":
                 # Find were the insertion or deletion happened
-                start_position = self.df["Protein_start"][i]
-                wtseq, mutseq = self.truncate_sequences(wtseq, mutseq, start_position)
+                #start_position = self.df["Protein_start"][i]
+                wtseq, mutseq = self.truncate_sequences(wtseq, mutseq)
 
             # compute evofit for wt and mut
             wt_vals = self._compute_evofit(wtseq, masked=masked)
