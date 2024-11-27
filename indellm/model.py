@@ -78,6 +78,46 @@ class DataProcessor:
     def read_csv(self, csv):
         self.data = pd.read_csv(csv)
         self.data_name = os.path.basename(csv).split(".")[0]
+        # Apply the function row by row
+        wt_seqs, mut_seqs = self.data.apply(lambda row: self._truncate_sequences(row["wt_seq"], row["mut_seq"]), axis=1)
+        self.data["wt_seq"] = wt_seqs
+        self.data["mut_seq"] = mut_seqs
+
+    @staticmethod
+    def _truncate_sequences(wtseq, mutseq):
+                
+        min_length = min(len(wtseq), len(mutseq))
+    
+        for i in range(min_length):
+            if wtseq[i] != mutseq[i]:
+                start_position = i # index of the first difference
+        
+        # Compute length
+        wt_len = len(wtseq)
+        mut_len = len(mutseq)
+        start_i = 0
+        end_i_wt = wt_len
+        end_i_mut = mut_len
+        diff = abs(wt_len - mut_len)
+        allowance = 500
+        if diff > 22: # ESM1 allowance
+            extra = diff - 22
+            extra = int(extra/2) + 1
+            allowance = allowance - extra
+        # recalculate index to have it centered at 500 each side
+        if start_position > allowance:
+            start_i = start_position - allowance
+        if wt_len > mut_len:
+            end_i_wt = start_position + allowance + diff
+            end_i_mut = start_position + allowance
+        else:
+            end_i_wt = start_position + allowance
+            end_i_mut = start_position + allowance + diff
+        wtseq = wtseq[start_i:end_i_wt]
+        mutseq = mutseq[start_i:end_i_mut]
+        
+        return wtseq, mutseq
+        
 
 
     def _init_device(self):
