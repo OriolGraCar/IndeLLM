@@ -146,9 +146,9 @@ class DataProcessor:
             "ESM2_8M": "esm2_t6_8M_UR50D",
             "ESM2_35M": "esm2_t12_35M_UR50D",
             "ESM2_150M": "esm2_t30_150M_UR50D",
-            "ESM2_650M": "esm2_t6_650M_UR50D",
-            "ESM2_3B": "esm2_t33_3B_UR50D",
-            "ESM2_15B": "esm2_t36_15B_UR50D",
+            "ESM2_650M": "esm2_t33_650M_UR50D",
+            "ESM2_3B": "esm2_t36_3B_UR50D",
+            "ESM2_15B": "esm2_t48_15B_UR50D",
             
             # ESM1b Model
             "ESM1b": "esm1b_t33_650M_UR50S",
@@ -197,8 +197,8 @@ class DataProcessor:
                 wt_result = model(wt_batch_tokens.to(self.device), repr_layers=[self.last_hlayer])
                 mut_result = model(mut_batch_tokens.to(self.device), repr_layers=[self.last_hlayer]) 
 
-            wt_logits = wt_result['logits'][:,:,4:24]  # batch_size, max_seq_len, tokens
-            mut_logits = mut_result['logits'][:,:,4:24] # batch_size, max_seq_len, tokens
+            wt_logits = wt_result['logits']  # batch_size, max_seq_len, tokens
+            mut_logits = mut_result['logits'] # batch_size, max_seq_len, tokens
 
             # Generate per-sequence representations via averaging
             # NOTE: token 0 is always a beginning-of-sequence token, so the first residue is token 1.

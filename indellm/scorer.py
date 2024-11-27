@@ -83,11 +83,14 @@ class Scorer:
         # Create data holders for the new dataframes 
         wt_fit_results = {}
         mut_fit_results = {}
-        score_dict = {"id":[], "Global_WT":[],"Global_mut":[], "LengthDiff":[], "ScoreLocal_wt":[], "ScoreLocal_mut":[], "ScoreLocal_clean":[], "Label":[]}
+        score_dict = {"id":[], "Brandes_wt":[],"Brandes_mut":[], "indel_length":[], 
+                      "IndeLLM_wt":[], "IndeLLM_mut":[], "IndeLLM_filtered":[], "label":[],
+                      "wt_seq": [], "mut_seq":[]}
 
 
-        for i, mutseq in enumerate(tqdm(self.df["mutseq"], desc="Processing sequences", disable=disable_tqm)):
-            wtseq = self.df["seq"][i]
+        for i, mutseq in enumerate(tqdm(self.df["mut_seq"], desc="Processing sequences", disable=disable_tqm)):
+            wtseq = self.df["wt_seq"][i]
+            s_id = self.df["id"]
             # Remove token X form sequence
             mutseq = mutseq.replace("X","")
             wtseq = wtseq.replace("X","")
@@ -99,7 +102,7 @@ class Scorer:
                 continue
 
             # Check if the sequence is too long
-            if (len(wtseq) > 1000 or len(mutseq) > 1000) and not self.df["seq_source"][i] == "refseq_NM":
+            if (len(wtseq) > 1000 or len(mutseq) > 1000):
                 # Find were the insertion or deletion happened
                 #start_position = self.df["Protein_start"][i]
                 wtseq, mutseq = self.truncate_sequences(wtseq, mutseq)
@@ -113,20 +116,22 @@ class Scorer:
 
             # Extract information
             try:
-                label = self.df["Classification"][i]
+                label = self.df["label"][i]
             except:
                 label = -1
 
-            score_dict["Label"].append(label)
-            score_dict["id"].append(i)
-            score_dict["Global_WT"].append(gwt_score)
-            score_dict["Global_mut"].append(gmut_score)
-            score_dict["ScoreLocal_wt"].append(localwt_score)
-            score_dict["ScoreLocal_mut"].append(localmut_score)
-            score_dict["ScoreLocal_clean"].append(clean_score)
-            score_dict["LengthDiff"].append(len(mutseq) - len(wtseq))
+            score_dict["label"].append(label)
+            score_dict["id"].append(s_id)
+            score_dict["Brandes_wt"].append(gwt_score)
+            score_dict["Brandes_mut"].append(gmut_score)
+            score_dict["IndeLLM_wt"].append(localwt_score)
+            score_dict["IndeLLM_mut"].append(localmut_score)
+            score_dict["IndeLLM_filtered"].append(clean_score)
+            score_dict["indel_length"].append(len(mutseq) - len(wtseq))
+            score_dict["wt_seq"].append(wtseq)
+            score_dict["mut_seq"].append(mutseq)
 
-            wt_fit_results.setdefault("id", []).append(i)
+            wt_fit_results.setdefault("id", []).append(s_id)
             for j in range(len(wt_vals)):
                 wt_fit_results.setdefault(str(j), []).append(wt_vals[j])
                 mut_fit_results.setdefault(str(j), []).append(mut_vals[j])
