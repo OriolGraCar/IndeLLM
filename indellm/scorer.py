@@ -2,7 +2,7 @@ from indellm import berteval
 import pandas as pd
 import numpy as np
 import os
-import tqdm
+from tqdm import tqdm
 
 
 class Scorer:
@@ -112,7 +112,7 @@ class Scorer:
             mut_vals = self._compute_evofit(mutseq, masked=masked)
 
             # Compute scores
-            gwt_score, gmut_score, localwt_score, localmut_score, clean_score = self.compute_PLLR(wtseq, mutseq) 
+            gwt_score, gmut_score, localwt_score, localmut_score, clean_score = self.compute_PLLR(wtseq, mutseq, wt_vals, mut_vals) 
 
             # Extract information
             try:
