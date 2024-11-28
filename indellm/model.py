@@ -4,7 +4,7 @@ import random
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler, Dataset
 import torch.nn as nn
-import tqdm
+from tqdm import tqdm
 import os 
 import pandas as pd
 import math
@@ -33,10 +33,11 @@ class Datahandler(Dataset):
         super().__init__()
         self.seq = row[f'{datatype}_seq']
         self.label = row['label']
+        self.unique_id = row['id']
     def __len__(self):
         return len(self.seq)
     def __getitem__(self, idx):
-        return (self.label[idx],self.seq[idx])
+        return (self.label[idx], self.seq[idx], self.unique_id)
     
 class ModelData(Dataset):
     def __init__(self, X, y):
@@ -79,7 +80,12 @@ class DataProcessor:
         self.data = pd.read_csv(csv)
         self.data_name = os.path.basename(csv).split(".")[0]
         # Apply the function row by row
-        wt_seqs, mut_seqs = self.data.apply(lambda row: self._truncate_sequences(row["wt_seq"], row["mut_seq"]), axis=1)
+        truncated_seqs = self.data.apply(lambda row: self._truncate_sequences(row["wt_seq"], row["mut_seq"]), axis=1)
+        
+        # Extract wt_seqs and mut_seqs from the tuples
+        wt_seqs = truncated_seqs.apply(lambda x: x[0])
+        mut_seqs = truncated_seqs.apply(lambda x: x[1])
+        
         self.data["wt_seq"] = wt_seqs
         self.data["mut_seq"] = mut_seqs
 
@@ -87,11 +93,10 @@ class DataProcessor:
     def _truncate_sequences(wtseq, mutseq):
                 
         min_length = min(len(wtseq), len(mutseq))
-    
+        start_position = min_length
         for i in range(min_length):
             if wtseq[i] != mutseq[i]:
                 start_position = i # index of the first difference
-        
         # Compute length
         wt_len = len(wtseq)
         mut_len = len(mutseq)
@@ -171,43 +176,48 @@ class DataProcessor:
         self.model, self.alphabet = esm.pretrained.load_model_and_alphabet(model_identifier)
         self.last_hlayer = int(model_identifier.split("_")[1][1:])
         self.model.eval()  # Set model to evaluation mode
-
+ 
+    @staticmethod
+    def _collate_fn(batch):
+        labels, sequences, unique_id = zip(*batch)
+        return list(zip(labels, sequences)), unique_id
    
     def extract_embeddings(self):
 
-        batch_converter = self.alphabet.get_batch_converter()
-        model = model.to(self.device)
 
-        wt_dataset = Datahandler(self.data, group="wt")
-        wt_dataloader = DataLoader(wt_dataset, batch_size=self.embedding_batch_size, shuffle=False, drop_last=False)
-        mt_dataset = Datahandler(self.data, group="mt")
-        mt_dataloader = DataLoader(mt_dataset, batch_size=self.embedding_batch_size, shuffle=False, drop_last=False)
+        batch_converter = self.alphabet.get_batch_converter()
+        self.model = self.model.to(self.device)
+
+        wt_dataset = Datahandler(self.data, "wt")
+        wt_dataloader = DataLoader(wt_dataset, batch_size=self.embedding_batch_size, collate_fn=self._collate_fn, shuffle=False, drop_last=False)
+        mt_dataset = Datahandler(self.data, "mut")
+        mt_dataloader = DataLoader(mt_dataset, batch_size=self.embedding_batch_size, collate_fn=self._collate_fn, shuffle=False, drop_last=False)
 
         concat = []
         plm_scores = []
         s = scorer.Scorer()
         for wt_tuple,mut_tuple in tqdm(zip(wt_dataloader,mt_dataloader),total=len(wt_dataloader), disable=self.tqdm_status):
-            batch_labels, wt_seqs, wt_batch_tokens = batch_converter(wt_tuple)
-            _, mut_seqs, mut_batch_tokens = batch_converter(mut_tuple)
+            batch_labels, wt_seqs, wt_batch_tokens = batch_converter(wt_tuple[0])
+            _, mut_seqs, mut_batch_tokens = batch_converter(mut_tuple[0])
             wt_batch_lens = (wt_batch_tokens != self.alphabet.padding_idx).sum(1)
             mut_batch_lens = (wt_batch_tokens != self.alphabet.padding_idx).sum(1)
-
             with torch.no_grad():
                 # Process batch
-                wt_result = model(wt_batch_tokens.to(self.device), repr_layers=[self.last_hlayer])
-                mut_result = model(mut_batch_tokens.to(self.device), repr_layers=[self.last_hlayer]) 
+                wt_result = self.model(wt_batch_tokens.to(self.device), repr_layers=[self.last_hlayer])
+                mut_result = self.model(mut_batch_tokens.to(self.device), repr_layers=[self.last_hlayer]) 
 
             wt_logits = wt_result['logits']  # batch_size, max_seq_len, tokens
             mut_logits = mut_result['logits'] # batch_size, max_seq_len, tokens
-
+            wt_reps = wt_result["representations"][self.last_hlayer]
+            mut_reps = mut_result["representations"][self.last_hlayer]
             # Generate per-sequence representations via averaging
             # NOTE: token 0 is always a beginning-of-sequence token, so the first residue is token 1.
             wt_sequence_representations = []
             mut_sequence_representations = []
 
             for i, tokens_len in enumerate(wt_batch_lens):
-                wt_sequence_representations.append(wt_result[i, 1 : tokens_len - 1].mean(0))
-                mut_sequence_representations.append(mut_result[i, 1 : mut_batch_lens[i] - 1].mean(0))
+                wt_sequence_representations.append(wt_reps[i, 1 : tokens_len - 1].mean(0))
+                mut_sequence_representations.append(mut_reps[i, 1 : mut_batch_lens[i] - 1].mean(0))
 
             # Convert logits to probabilities using softmax
             wt_probs = torch.nn.functional.softmax(wt_logits, dim=-1)  # Shape: (batch_size, seq_length, vocab_size)
@@ -240,23 +250,24 @@ class DataProcessor:
                 # Compute PLM score
                 _, _, local_wt, local_mut, _ = s.compute_PLLR(wtseq=wt_sequence, mutseq=mut_sequence, wt_p=wt_sequence_probs, mut_p=mut_sequence_probs)
                 plm_scores.append(local_mut - local_wt)
+                
 
             # Stack and concat
             stack_wt = torch.stack(wt_sequence_representations)
             stack_mut = torch.stack(mut_sequence_representations)
             concat.append(torch.cat((stack_wt, stack_mut), dim=1))
-
         # Concat all batches and save    
         concat = torch.cat(concat, dim=0).detach().cpu() 
         final_result = {'x': concat, 'label': self.data["label"], 'score':plm_scores, 'id': self.data["id"]}
-        
+        #for i in range(len(plm_scores)):
+        #    #print(plm_scores[i],self.data["label"][i])        
         if not os.path.isdir(f'{self.embedding_path}'):
             os.makedirs(f'{self.embedding_path}')  # create the dir for embeddings
 
         final_location = os.path.join(self.embedding_path, f"{self.data_name}_embedding.pt")
         
         torch.save(final_result,final_location) 
-        print(f"Embedding Saved at:{self.embedding_path}\n")
+        # print(f"Embedding Saved at:{self.embedding_path}\n")
 
 
 class MLPClassifier_LeakyReLu(nn.Module):
