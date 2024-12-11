@@ -43,6 +43,7 @@ class Scorer:
     def truncate_sequences(wtseq, mutseq):
 
         min_length = min(len(wtseq), len(mutseq))
+        start_position = min_length
     
         for i in range(min_length):
             if wtseq[i] != mutseq[i]:
@@ -76,10 +77,7 @@ class Scorer:
     
 
     def score_data(self, masked=False, disable_tqm=True):
-
-        if not self.df:
-            raise("Load data first with .load_csv_to_score(data_csv, results_path)")
-        
+       
         # Create data holders for the new dataframes 
         wt_fit_results = {}
         mut_fit_results = {}

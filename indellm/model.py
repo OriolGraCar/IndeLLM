@@ -225,9 +225,6 @@ class DataProcessor:
 
 
             # Create the dictionary for amino acid probabilities
-            amino_acids = "ACDEFGHIKLMNPQRSTVWY"  # Standard amino acids
-            amino_acid_indices = {token: i for i, token in enumerate(self.alphabet.all_toks) if token in amino_acids}
-
             for batch_idx, wt_sequence in enumerate(wt_seqs):
                 mut_sequence = mut_seqs[batch_idx]
                 wt_sequence_probs = []
@@ -235,17 +232,15 @@ class DataProcessor:
 
                 # Iterate over wildtype
                 for position, token in enumerate(wt_sequence):
-                    if token in amino_acid_indices:  # Check if token is an amino acid
-                        token_idx = wt_batch_tokens[batch_idx, position].item() # Get the token index
-                        aa_probability = wt_probs[batch_idx, position, token_idx].item()  # Get probability for the specific amino acid
-                        wt_sequence_probs.append(aa_probability)  # Add to the list
+                    token_idx = wt_batch_tokens[batch_idx, position].item() # Get the token index
+                    aa_probability = wt_probs[batch_idx, position, token_idx].item()  # Get probability for the specific amino acid
+                    wt_sequence_probs.append(aa_probability)  # Add to the list
 
                 # iterate over mutant
                 for position, token in enumerate(mut_sequence):
-                    if token in amino_acid_indices:  
-                        token_idx = mut_batch_tokens[batch_idx, position].item() 
-                        aa_probability = mut_probs[batch_idx, position, token_idx].item()  
-                        mut_sequence_probs.append(aa_probability)  
+                    token_idx = mut_batch_tokens[batch_idx, position].item() 
+                    aa_probability = mut_probs[batch_idx, position, token_idx].item()  
+                    mut_sequence_probs.append(aa_probability)  
 
                 # Compute PLM score
                 _, _, local_wt, local_mut, _ = s.compute_PLLR(wtseq=wt_sequence, mutseq=mut_sequence, wt_p=wt_sequence_probs, mut_p=mut_sequence_probs)
@@ -488,7 +483,8 @@ class Indellm:
 
             if early_stop_count >= early_stop:
                 print('\nModel is not improving, halting train session.')
-                return
+                return best_loss
+        return best_loss
 
     def assess_performance(self, model_path, output_path):
   
