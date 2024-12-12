@@ -81,8 +81,8 @@ class Scorer:
         # Create data holders for the new dataframes 
         wt_fit_results = {}
         mut_fit_results = {}
-        score_dict = {"id":[], "Brandes_wt":[],"Brandes_mut":[], "indel_length":[], 
-                      "IndeLLM_wt":[], "IndeLLM_mut":[], "IndeLLM_filtered":[], "label":[],
+        score_dict = {"id":[], "Brandes_wt":[],"Brandes_mut":[],
+                      "IndeLLM_wt":[], "IndeLLM_mut":[], "IndeLLM_filtered":[], "label":[], "indel_length":[],
                       "wt_seq": [], "mut_seq":[]}
 
 
