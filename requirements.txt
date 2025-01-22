@@ -5,4 +5,4 @@ fair-esm
 tqdm
 matplotlib
 seaborn
-sklearn
+scikit-learn
