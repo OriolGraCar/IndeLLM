@@ -8,11 +8,10 @@ from tqdm import tqdm
 import os 
 import pandas as pd
 import math
-from sklearn.metrics import classification_report
 from sklearn.metrics import matthews_corrcoef
 from sklearn.metrics import roc_auc_score
 from indellm import scorer
-
+from indellm import utils
 
 def set_random_seeds(seed: int):
     """
@@ -69,6 +68,9 @@ class DataProcessor:
         self._init_device()
         self._load_esm_model(self.model_name)
 
+    def set_data_name(self, name):
+        self.data_name = name
+
     def set_data(self, data):
         self.data = data
 
@@ -78,9 +80,10 @@ class DataProcessor:
     
     def read_csv(self, csv):
         self.data = pd.read_csv(csv)
+        self.csv = csv
         self.data_name = os.path.basename(csv).split(".")[0]
         # Apply the function row by row
-        truncated_seqs = self.data.apply(lambda row: self._truncate_sequences(row["wt_seq"], row["mut_seq"]), axis=1)
+        truncated_seqs = self.data.apply(lambda row: utils.truncate_sequences(row["wt_seq"], row["mut_seq"]), axis=1)
         
         # Extract wt_seqs and mut_seqs from the tuples
         wt_seqs = truncated_seqs.apply(lambda x: x[0])
@@ -88,41 +91,6 @@ class DataProcessor:
         
         self.data["wt_seq"] = wt_seqs
         self.data["mut_seq"] = mut_seqs
-
-    @staticmethod
-    def _truncate_sequences(wtseq, mutseq):
-                
-        min_length = min(len(wtseq), len(mutseq))
-        start_position = min_length
-        for i in range(min_length):
-            if wtseq[i] != mutseq[i]:
-                start_position = i # index of the first difference
-        # Compute length
-        wt_len = len(wtseq)
-        mut_len = len(mutseq)
-        start_i = 0
-        end_i_wt = wt_len
-        end_i_mut = mut_len
-        diff = abs(wt_len - mut_len)
-        allowance = 500
-        if diff > 22: # ESM1 allowance
-            extra = diff - 22
-            extra = int(extra/2) + 1
-            allowance = allowance - extra
-        # recalculate index to have it centered at 500 each side
-        if start_position > allowance:
-            start_i = start_position - allowance
-        if wt_len > mut_len:
-            end_i_wt = start_position + allowance + diff
-            end_i_mut = start_position + allowance
-        else:
-            end_i_wt = start_position + allowance
-            end_i_mut = start_position + allowance + diff
-        wtseq = wtseq[start_i:end_i_wt]
-        mutseq = mutseq[start_i:end_i_mut]
-        
-        return wtseq, mutseq
-        
 
 
     def _init_device(self):
@@ -192,15 +160,16 @@ class DataProcessor:
         wt_dataloader = DataLoader(wt_dataset, batch_size=self.embedding_batch_size, collate_fn=self._collate_fn, shuffle=False, drop_last=False)
         mt_dataset = Datahandler(self.data, "mut")
         mt_dataloader = DataLoader(mt_dataset, batch_size=self.embedding_batch_size, collate_fn=self._collate_fn, shuffle=False, drop_last=False)
-
         concat = []
-        plm_scores = []
+        indel_lens = []
+        indel_types = []
         s = scorer.Scorer()
         for wt_tuple,mut_tuple in tqdm(zip(wt_dataloader,mt_dataloader),total=len(wt_dataloader), disable=self.tqdm_status):
             batch_labels, wt_seqs, wt_batch_tokens = batch_converter(wt_tuple[0])
             _, mut_seqs, mut_batch_tokens = batch_converter(mut_tuple[0])
+                    
             wt_batch_lens = (wt_batch_tokens != self.alphabet.padding_idx).sum(1)
-            mut_batch_lens = (wt_batch_tokens != self.alphabet.padding_idx).sum(1)
+            mut_batch_lens = (mut_batch_tokens != self.alphabet.padding_idx).sum(1)
             with torch.no_grad():
                 # Process batch
                 wt_result = self.model(wt_batch_tokens.to(self.device), repr_layers=[self.last_hlayer])
@@ -214,19 +183,42 @@ class DataProcessor:
             # NOTE: token 0 is always a beginning-of-sequence token, so the first residue is token 1.
             wt_sequence_representations = []
             mut_sequence_representations = []
+            indel_sequence_representations = []
+
 
             for i, tokens_len in enumerate(wt_batch_lens):
-                wt_sequence_representations.append(wt_reps[i, 1 : tokens_len - 1].mean(0))
-                mut_sequence_representations.append(mut_reps[i, 1 : mut_batch_lens[i] - 1].mean(0))
 
+                wt_seq = wt_seqs[i]
+                mut_seq = mut_seqs[i]
+      
+                start, end, length_diff, indel_type = utils.get_indel_info(wt_seq, mut_seq)
+
+                if indel_type == 0: # This means deletion
+
+                    # Now we found the indexes, slice the sequence
+                    wt_sliced = torch.cat((wt_reps[i, 1 : start], wt_reps[i, end: wt_batch_lens[i] - 1]))
+                    indel_sequence_representations.append(wt_reps[i, start: end].mean(0))
+                    wt_sequence_representations.append(wt_sliced.mean(0))
+                    mut_sequence_representations.append(mut_reps[i, 1 : mut_batch_lens[i] - 1].mean(0))
+
+
+                else: # This means insertion
+                        
+                    # Now we found the indexes, slice the sequence
+                    mut_sliced = torch.cat((mut_reps[i, 1 : start], mut_reps[i, end: mut_batch_lens[i] - 1]))
+                    indel_sequence_representations.append(mut_reps[i, start: end].mean(0))
+                    mut_sequence_representations.append(mut_sliced.mean(0))
+                    wt_sequence_representations.append(wt_reps[i, 1 : wt_batch_lens[i] - 1].mean(0))
+            
+                indel_lens.append(length_diff)
+                indel_types.append(indel_type)
+            """
             # Convert logits to probabilities using softmax
             wt_probs = torch.nn.functional.softmax(wt_logits, dim=-1)  # Shape: (batch_size, seq_length, vocab_size)
             mut_probs = torch.nn.functional.softmax(mut_logits, dim=-1)  # Shape: (batch_size, seq_length, vocab_size)
 
-
+            
             # Create the dictionary for amino acid probabilities
-            amino_acids = "ACDEFGHIKLMNPQRSTVWY"  # Standard amino acids
-            amino_acid_indices = {token: i for i, token in enumerate(self.alphabet.all_toks) if token in amino_acids}
 
             for batch_idx, wt_sequence in enumerate(wt_seqs):
                 mut_sequence = mut_seqs[batch_idx]
@@ -235,32 +227,31 @@ class DataProcessor:
 
                 # Iterate over wildtype
                 for position, token in enumerate(wt_sequence):
-                    if token in amino_acid_indices:  # Check if token is an amino acid
-                        token_idx = wt_batch_tokens[batch_idx, position].item() # Get the token index
-                        aa_probability = wt_probs[batch_idx, position, token_idx].item()  # Get probability for the specific amino acid
-                        wt_sequence_probs.append(aa_probability)  # Add to the list
+                    token_idx = wt_batch_tokens[batch_idx, position + 1].item() # Get the token index
+                    aa_probability = wt_probs[batch_idx, position + 1, token_idx].item()  # Get probability for the specific amino acid
+                    wt_sequence_probs.append(aa_probability)  # Add to the list
 
                 # iterate over mutant
                 for position, token in enumerate(mut_sequence):
-                    if token in amino_acid_indices:  
-                        token_idx = mut_batch_tokens[batch_idx, position].item() 
-                        aa_probability = mut_probs[batch_idx, position, token_idx].item()  
-                        mut_sequence_probs.append(aa_probability)  
+                    token_idx = mut_batch_tokens[batch_idx, position + 1].item() 
+                    aa_probability = mut_probs[batch_idx, position + 1, token_idx].item()  
+                    mut_sequence_probs.append(aa_probability)  
 
                 # Compute PLM score
                 _, _, local_wt, local_mut, _ = s.compute_PLLR(wtseq=wt_sequence, mutseq=mut_sequence, wt_p=wt_sequence_probs, mut_p=mut_sequence_probs)
-                plm_scores.append(local_mut - local_wt)
+                #plm_scores.append(local_mut - local_wt + 1)
+                plm_scores.append(0)
                 
-
+            """
             # Stack and concat
             stack_wt = torch.stack(wt_sequence_representations)
             stack_mut = torch.stack(mut_sequence_representations)
-            concat.append(torch.cat((stack_wt, stack_mut), dim=1))
+            stack_indels = torch.stack(indel_sequence_representations)
+            concat.append(torch.cat((stack_wt, stack_mut, stack_indels), dim=1))
         # Concat all batches and save    
         concat = torch.cat(concat, dim=0).detach().cpu() 
-        final_result = {'x': concat, 'label': self.data["label"], 'score':plm_scores, 'id': self.data["id"]}
-        #for i in range(len(plm_scores)):
-        #    #print(plm_scores[i],self.data["label"][i])        
+        final_result = {'x': concat, 'label': self.data["label"], 'lengths':indel_lens, "type":indel_types, 'id': self.data["id"]}
+        
         if not os.path.isdir(f'{self.embedding_path}'):
             os.makedirs(f'{self.embedding_path}')  # create the dir for embeddings
 
@@ -272,14 +263,14 @@ class DataProcessor:
 
 class MLPClassifier_LeakyReLu(nn.Module):
 
-    def __init__(self, num_input, num_hidden, num_output):
+    def __init__(self, num_input, num_hidden, num_output, negative_slope):
         super(MLPClassifier_LeakyReLu, self).__init__()
 
         # Instantiate an one-layer feed-forward classifier
         self.hidden = nn.Linear(num_input, num_hidden)
         self.predict = nn.Sequential(
             nn.Dropout(0.5),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(inplace=True, negative_slope=negative_slope),
             nn.Linear(num_hidden, num_output)
         )
         self.softmax = nn.Softmax(dim=1)
@@ -293,7 +284,7 @@ class MLPClassifier_LeakyReLu(nn.Module):
 
 class Indellm:
 
-    def __init__(self, batch_size = 32, learning_rate = 1e-4, hidden_layer_size = 1028):
+    def __init__(self, batch_size=32, learning_rate =0.01, hidden_layer_size = 8, n_slope = 0.1):
         # visual
         self.tqdm_status = False
         # data holders
@@ -303,11 +294,13 @@ class Indellm:
         self.y_test = None
         self.x_valid = None
         self.y_valid = None
+        self.n_slope = n_slope
         self.train_loader = None
         self.test_loader = None
         self.val_loader = None
         self.test_seq_ids = None
         # Model and parameter holders
+        self.n_slope = n_slope
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.hidden_layer_size = hidden_layer_size
@@ -323,11 +316,17 @@ class Indellm:
 
         pt_embeds = torch.load(dataset_path)
         data_X = np.array(pt_embeds['x'])
-        score = np.array(pt_embeds['score']).reshape(-1, 1)
+        # Compute max and min
+        # rows_with_nan = np.where(np.isnan(data_X).any(axis=1))[0]
+
+        # print("Row indices with NaN values:", rows_with_nan)
+        lens = np.array(pt_embeds['lengths']).reshape(-1, 1)
+        indel_type = np.array(pt_embeds['type']).reshape(-1, 1)
         data_y = pt_embeds['label']
         unique_id = pt_embeds['id']
 
-        data_X = np.hstack((data_X, score))
+        data_X = np.hstack((data_X, lens))
+        data_X = np.hstack((data_X,indel_type))
 
         return data_X, data_y, unique_id
     
@@ -337,7 +336,7 @@ class Indellm:
         Detect the available device (CUDA, MPS, or CPU) and print its details.
         :return: The detected device.
         """
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and 1==2:
             self.device = torch.device("cuda")
             print(f"There are {torch.cuda.device_count()} GPU(s) available.")
             print("Device name:", torch.cuda.get_device_name(0))
@@ -354,14 +353,15 @@ class Indellm:
   
 
     def load_train_data(self, train_data, test_data, val_data):
-        self.x_train, self.y_train, _, self.train_loader = self._load_embedding_data(train_data, shuffle=True)
+        self.x_train, self.y_train, self.train_seq_ids, self.train_loader = self._load_embedding_data(train_data, shuffle=True)
         self.x_test, self.y_test, self.test_seq_ids, self.test_loader = self._load_embedding_data(test_data)
-        self.x_valid, self.y_valid, _, self.val_loader = self._load_embedding_data(val_data)
+        self.x_valid, self.y_valid, self.val_seq_ids, self.val_loader = self._load_embedding_data(val_data)
 
 
     @staticmethod
     def _flat_accuracy(preds, labels):
         preds = preds.detach().cpu().numpy()
+        labels = labels.detach().cpu().numpy()
         pred_flat = np.argmax(preds, axis=1).flatten()
         labels_flat = labels.flatten()
         return np.sum(pred_flat == labels_flat) / len(labels_flat)
@@ -369,15 +369,14 @@ class Indellm:
 
     def train(self, storage_path, model_name, n_epochs, early_stop):
 
-        model_size = self.X_train.shape[1]
-
+        model_size = self.x_train.shape[1]
         print('\n\n\n\n')
-        print('=============== VariPred model training start ===============')
+        print('=============== Model training start ===============')
   
         print('model_size: ', model_size)
         print('num_hidden: ', self.hidden_layer_size)
         
-        self.model = MLPClassifier_LeakyReLu(num_input = model_size, num_hidden = self.hidden_layer_size, num_output = 2).to(self.device)
+        self.model = MLPClassifier_LeakyReLu(num_input = model_size, num_hidden = self.hidden_layer_size, num_output = 2, negative_slope = self.n_slope).to(self.device)
 
         total_params = sum(p.numel() for p in self.model.parameters())
         print(f'{total_params:,} total parameters.')
@@ -393,7 +392,7 @@ class Indellm:
         #                                         num_warmup_steps= 0,
         #                                         num_training_steps= len(train_loader)*n_epochs)
 
-        n_epochs, best_loss, step, early_stop_count = n_epochs, math.inf, 0, early_stop
+        n_epochs, best_perf, step, early_stop_count = n_epochs, 0, 0, early_stop
 
         for epoch in range(n_epochs):
             self.model.train()  # Set the model to train mode.
@@ -405,24 +404,21 @@ class Indellm:
                 optimizer.zero_grad()               # Set gradient to zero.
                 # Move the data to device.
                 b_seq, b_labels = tuple(t.to(self.device) for t in batch)
-
                 pred = self.model(b_seq.float())
                 b_labels = b_labels.float()
                 loss = criterion(pred[:, 0], b_labels)
 
                 # Compute gradient(backpropagation).
                 loss.backward()
-
                 optimizer.step()                    # Update parameters.
                 # scheduler.step()
 
                 step += 1
                 loss_record.append(loss.detach().item())
-
                 # Display current epoch number and loss on tqdm progress bar.
                 train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
                 train_pbar.set_postfix({'loss': loss.detach().item()})
-
+            
             mean_train_loss = sum(loss_record)/len(loss_record)
 
             ########### =========================== Evaluation=========================################
@@ -430,10 +426,9 @@ class Indellm:
 
             self.model.eval()  # Set the model to evaluation mode.
             loss_record = []
-            total_eval_accuracy = 0
 
-            #preds = []
-            #labels = []
+            preds_record = []
+            labels_record = []
 
             val_pbar = tqdm(self.val_loader, position=0, leave=True, disable=self.tqdm_status)
             for batch in val_pbar:
@@ -449,10 +444,12 @@ class Indellm:
                     # labels.append(b_labels.detach().cpu()[0].tolist())
 
                 loss_record.append(loss.item())
-                total_eval_accuracy += self._flat_accuracy(pred, b_labels)
+                #total_eval_accuracy += self._flat_accuracy(pred, b_labels)
 
                 val_pbar.set_description(f'Evaluating [{epoch + 1}/{n_epochs}]')
                 val_pbar.set_postfix({'evaluate loss': loss.detach().item()})
+                preds_record.append(pred[:,0].cpu().numpy())
+                labels_record.append(b_labels.cpu().numpy())
 
             # For selecting the best MCC threshold
             # breakpoint()
@@ -464,12 +461,15 @@ class Indellm:
 
             mean_valid_loss = sum(loss_record)/len(loss_record)
             #avg_val_accuracy = total_eval_accuracy / len(self.val_loader)
+            labels_record =  np.concatenate(labels_record, axis=0)
+            preds_record  =  np.concatenate(preds_record, axis=0)
+            auc_value = roc_auc_score(labels_record, preds_record)
 
-            print(f'\nEpoch [{epoch + 1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}')
+            print(f'\nEpoch [{epoch + 1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}, AUC {auc_value:.4f}')
 
             # Save best models
-            if mean_valid_loss < best_loss:
-                best_loss = mean_valid_loss
+            if auc_value > best_perf:
+                best_perf = auc_value
 
                 if not os.path.isdir(f'{storage_path}'):
                     # Create directory of saving models.
@@ -479,7 +479,7 @@ class Indellm:
                     'model_state_dict': self.model.state_dict(), },
                     f'{storage_path}/{model_name}.ckpt')  # Save the best model
 
-                print('\nSaving model with loss {:.3f}...'.format(best_loss))
+                print('\nSaving model with loss {:.3f}...'.format(mean_valid_loss))
                 print(f"Epoch {epoch}")
 
                 early_stop_count = 0
@@ -490,15 +490,18 @@ class Indellm:
                 print('\nModel is not improving, halting train session.')
                 return
 
-    def assess_performance(self, model_path, output_path):
+    def assess_performance(self, model_path, model_name, output_path):
   
         print('=============== Predicting & Evaluating the trained model ===============')
-        checkpoint=torch.load(f'{model_path}/model.ckpt')
+        checkpoint=torch.load(f'{model_path}/{model_name}.ckpt')
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        self._predict(self.test_loader, self.test_seq_ids, train=True, output_path=output_path)
+        results_val = self._predict(self.val_loader, self.val_seq_ids, train=True, output_path=output_path)
+        results_train = self._predict(self.train_loader, self.train_seq_ids, train=True, output_path=output_path)
+        results_test = self._predict(self.test_loader, self.test_seq_ids, train=True, output_path=output_path)
+        return results_train, results_val, results_test
 
     
-    def _predict(self, data_loader, record_id, train=False, output_path=None, output_name=None):
+    def _predict(self, data_loader, record_id, train=False, output_path=None, output_name=None,threshold=0.46):
 
         self.model.eval()  # Set the model to evaluation mode.
         preds = []
@@ -521,44 +524,36 @@ class Indellm:
             auc_value = roc_auc_score(labels, preds)
             print('AUC score: ', auc_value)
 
-            y_true_np = np.array(labels)
-            preds = np.array(preds >= 0.2, dtype=int)
-
-            MCC = matthews_corrcoef(y_true_np, preds)
-            print('MCC: ', MCC)
-
-            report = classification_report(
-                y_true_np, preds, target_names=label_names)
-            print(report)
+            return auc_value
 
             # Saving the prediction results for each test data
-            if not os.path.exists(f'{output_path}/model_eval_result.txt'):
-                header = "target_id\tlabel\tprediction\n"
-                with open(f'{output_path}/model_eval_result.txt', 'a') as file_writer:
-                    file_writer.write(header)
+            #if not os.path.exists(f'{output_path}/model_eval_result.txt'):
+            #    header = "target_id\tlabel\tprediction\n"
+            #    with open(f'{output_path}/model_eval_result.txt', 'a') as file_writer:
+            #        file_writer.write(header)
+    
+            #for ids, label, pred_value in zip(record_id, y_true_np, preds):
+            #    with open(f'{output_path}/model_eval_result.txt', 'a+') as f:
+            #        f.write(f'{ids}\t{label}\t{pred_value}\n')
 
-            for ids, label, pred_value in zip(record_id, y_true_np, preds):
-                with open(f'{output_path}/model_eval_result.txt', 'a+') as f:
-                    f.write(f'{ids}\t{label}\t{pred_value}\n')
-
-            with open(f'{output_path}/model_performance.txt', 'a') as file_writer:
-                file_writer.write(f'MCC: {MCC}\nroc_auc_score: {auc_value}\n')
+            #with open(f'{output_path}/model_performance.txt', 'a') as file_writer:
+            #    file_writer.write(f'MCC: {MCC}\nroc_auc_score: {auc_value}\n')
 
         else:
 
-            preds = np.array(preds >= 0.2, dtype=int)
+            preds2 = np.array(preds >= threshold, dtype=int)
 
             if not os.path.exists(f'../example/{output_name}.txt'):
-                header = "target_id\tprediction\n"
+                header = "id,score,prediction\n"
                 with open(f'{output_path}/{output_name}.txt', 'a') as file_writer:
                     file_writer.write(header)
 
-            for ids, pred_value in zip(record_id, preds):
+            for ids, pred_value, pred_label in zip(record_id, preds, preds2):
                 with open(f'{output_path}/{output_name}.txt', 'a+') as f:
-                    f.write(f'{ids}\t{pred_value}\n')
+                    f.write(f'{ids},{pred_value},{pred_label}\n')
 
 
-    def run(self, data_location, model_location, plm_name, embedding_path, output_path, output_name):
+    def run(self, data_location, model_location, plm_name, embedding_path, output_path, output_name, threshold=0.46):
         '''
 
         input: 
@@ -569,32 +564,35 @@ class Indellm:
 
         '''
 
+
         target_df = pd.read_csv(data_location)
         target_df['label'] = -1 # To fill column
-        print(f'Generating embedings for {data_location}.csv')  
-        d = DataProcessor(plm_name, 42, embedding_path) # To fix once the flow is stablished 
+        print(f'Generating embedings for {data_location}.csv')
+        d = DataProcessor(plm_name, embedding_path, 42) 
         d.set_data(target_df)
-        d.extract_embeddings()
         data_name = os.path.basename(data_location).split(".")[0]
+        d.set_data_name(data_name)
+        d.extract_embeddings()
         embedding_location = os.path.join(embedding_path, f"{data_name}_embedding.pt")
 
         x_target, y_target, record_id = self.unpickler(embedding_location)
-        print('X_target shape: ', x_target.shape)
+        #print('X_target shape: ', x_target.shape)
 
         target_dataset = ModelData(x_target, y_target)
         target_loader = DataLoader(target_dataset, batch_size=32)
 
         model_size = x_target.shape[1]
-        num_hidden = int(model_size/2) 
-        self.model = MLPClassifier_LeakyReLu(num_input = model_size, num_hidden = num_hidden, num_output = 2).to(self.device)
-  
+        self.model = MLPClassifier_LeakyReLu(num_input = model_size, num_hidden = self.hidden_layer_size, num_output = 2, negative_slope = self.n_slope).to(self.device)
+
         if not os.path.exists(model_location):
             print('No model found')
-        
+
         checkpoint=torch.load(model_location)
         self.model.load_state_dict(checkpoint['model_state_dict'])
 
-        self._predict(target_loader, record_id, train=False, output_path=output_path, output_name=output_name)
-        
+        self._predict(target_loader, record_id, train=False, output_path=output_path, output_name=output_name, threshold=threshold)
+
+
         print()
         print(f"Your prediction results are saved in {output_path}/{output_name}.txt")
+

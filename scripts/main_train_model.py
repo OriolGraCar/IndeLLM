@@ -41,7 +41,7 @@ def main(args):
 
     # Model initialization
     print("Preparing Training")
-    m = model.Indellm() #  default arguments batch_size = 32, learning_rate = 1e-4, hidden_layer_size = 1028
+    m = model.Indellm() #  default arguments batch_size=32, learning_rate =0.01, hidden_layer_size = 8, n_slope = 0.1
     if disable_tqdm:
         m.disable_tqdm()
     m.load_train_data(train_data=train_embd, test_data=test_embd, val_data=val_embd)
