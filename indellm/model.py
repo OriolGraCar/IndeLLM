@@ -559,11 +559,12 @@ class Indellm:
         # Check type of data
         if isinstance(data_location, str):
             target_df = pd.read_csv(data_location)
+            print(f'Generating embedings for {data_location}')
         else: # This means is a DataFrame already
             target_df = data_location
+            print("Generating embedings")
             
         target_df['label'] = -1 # To fill column
-        print(f'Generating embedings for {data_location}.csv')
         d = DataProcessor(plm_name, embedding_path, 42) 
         d.set_data(target_df)
         data_name = os.path.basename(data_location).split(".")[0]
