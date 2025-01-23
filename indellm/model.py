@@ -543,10 +543,10 @@ class Indellm:
 
             preds2 = np.array(preds >= threshold, dtype=int)
 
-            if not os.path.exists(f'../example/{output_name}.txt'):
-                header = "id,score,prediction\n"
-                with open(f'{output_path}/{output_name}.txt', 'a') as file_writer:
-                    file_writer.write(header)
+            header = "id,score,prediction\n"
+
+            with open(f'{output_path}/{output_name}.txt', 'w') as file_writer:
+                file_writer.write(header)
 
             for ids, pred_value, pred_label in zip(record_id, preds, preds2):
                 with open(f'{output_path}/{output_name}.txt', 'a+') as f:

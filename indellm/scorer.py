@@ -92,6 +92,7 @@ class Scorer:
             score_dict["mut_seq"].append(mutseq)
 
             wt_fit_results.setdefault("id", []).append(s_id)
+            mut_fit_results.setdefault("id", []).append(s_id)
             for j in range(len(wt_vals)):
                 wt_fit_results.setdefault(str(j), []).append(wt_vals[j])
                 mut_fit_results.setdefault(str(j), []).append(mut_vals[j])
