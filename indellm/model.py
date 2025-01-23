@@ -555,17 +555,13 @@ class Indellm:
 
     def run(self, data_location, model_location, plm_name, embedding_path, output_path, output_name, threshold=0.46):
         '''
-
-        input: 
-            target_ds: path of embeddings of target set (without a true label)
-
-        output:
-            model predictions (e.g. ../example/output_results/VariPred_output.txt)
-
         '''
-
-
-        target_df = pd.read_csv(data_location)
+        # Check type of data
+        if isinstance(data_location, str):
+            target_df = pd.read_csv(data_location)
+        else: # This means is a DataFrame already
+            target_df = data_location
+            
         target_df['label'] = -1 # To fill column
         print(f'Generating embedings for {data_location}.csv')
         d = DataProcessor(plm_name, embedding_path, 42) 
