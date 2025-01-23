@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="A script to score PLLR of indels.")
 
     parser.add_argument("--plm", type=str, 
-                        help="Name of the PLM model: The following are accepted names: ESM2_8M, ESM2_35M, ESM2_150M, ESM2_650M, ESM2_3B, ESM2_15B, ESM1b, ESM1v, BertRost\n Alternatively give a path of a HuggingFace model")
+                        help="Name of the PLM model: The following are accepted names: ESM2_35M, ESM2_150M, ESM2_650M, ESM2_3B, ESM2_15B, ESM1b, ESM1v, BertRost\n Alternatively give a path of a HuggingFace model")
     parser.add_argument("--tokenizer", type=str, default=None, help="Tokenizer to use. This is only required for running a model not on the predefined list.")
     parser.add_argument("--csv_data", type=str, help="Location of the csv with the data to process.")
     parser.add_argument("--out_path", type=str, help="Path to use when storing the results of the scoring.")
