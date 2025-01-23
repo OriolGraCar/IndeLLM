@@ -118,7 +118,7 @@ class Scorer:
         diff_len = len(wtseq) - len(mutseq)
         extra = 0
         """
-        start, end, length_diff, indel_type = utils.get_indel_info(wrseq, mutseq)
+        start, end, length_diff, indel_type = utils.get_indel_info(wtseq, mutseq)
 
         for i in range(end):
             if i < start:
