@@ -560,14 +560,15 @@ class Indellm:
         if isinstance(data_location, str):
             target_df = pd.read_csv(data_location)
             print(f'Generating embedings for {data_location}')
+            data_name = os.path.basename(data_location).split(".")[0]
         else: # This means is a DataFrame already
             target_df = data_location
             print("Generating embedings")
+            data_name = pl_name
             
         target_df['label'] = -1 # To fill column
         d = DataProcessor(plm_name, embedding_path, 42) 
         d.set_data(target_df)
-        data_name = os.path.basename(data_location).split(".")[0]
         d.set_data_name(data_name)
         d.extract_embeddings()
         embedding_location = os.path.join(embedding_path, f"{data_name}_embedding.pt")
