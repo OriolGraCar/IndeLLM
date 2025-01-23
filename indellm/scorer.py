@@ -51,7 +51,7 @@ class Scorer:
 
         for i, mutseq in enumerate(tqdm(self.df["mut_seq"], desc="Processing sequences", disable=disable_tqm)):
             wtseq = self.df["wt_seq"][i]
-            s_id = self.df["id"]
+            s_id = self.df["id"][i]
             # Remove token X form sequence
             mutseq = mutseq.replace("X","")
             wtseq = wtseq.replace("X","")
@@ -119,17 +119,22 @@ class Scorer:
         extra = 0
         """
         start, end, length_diff, indel_type = utils.get_indel_info(wtseq, mutseq)
+        min_length = min(len(wtseq), len(mutseq))
 
-        for i in range(end):
-            if i < start:
-                wt_i = i
-                mut_i = i
-            elif i >= start:
-                if indel_type == 0: # This means deletion
+        for i in range(min_length):
+            if indel_type == 0: # This means deletion
+                if i < start:
+                   wt_i = i 
+                   mut_i = i
+                else:
                     wt_i = i + length_diff
-                    mut_i = i
-                else: # This means insertion
-                    wt_i = i
+                    mut_i = i 
+            else: # This means insertion
+                if i < start:
+                   wt_i = i 
+                   mut_i = i
+                else:
+                    wt_i = i 
                     mut_i = i + length_diff
                 
             score_wt = wt_p[wt_i]
