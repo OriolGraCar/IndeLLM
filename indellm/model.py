@@ -564,7 +564,7 @@ class Indellm:
         else: # This means is a DataFrame already
             target_df = data_location
             print("Generating embedings")
-            data_name = pl_name
+            data_name = plm_name
             
         target_df['label'] = -1 # To fill column
         d = DataProcessor(plm_name, embedding_path, 42) 
