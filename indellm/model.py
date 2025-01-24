@@ -294,6 +294,7 @@ class Indellm:
         self.y_test = None
         self.x_valid = None
         self.y_valid = None
+        self.data_df = None
         self.n_slope = n_slope
         self.train_loader = None
         self.test_loader = None
@@ -567,6 +568,7 @@ class Indellm:
             data_name = plm_name
             
         target_df['label'] = -1 # To fill column
+        self.data_df = target_df
         d = DataProcessor(plm_name, embedding_path, 42) 
         d.set_data(target_df)
         d.set_data_name(data_name)
