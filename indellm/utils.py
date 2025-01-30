@@ -12,6 +12,9 @@ def get_indel_info(wt_seq, mut_seq):
         print(alignment)
         raise Exception("Sequences must have only one indel")
 
+    if len(mut_seq) == len(wt_seq):
+        raise Exception("Sequences muts have different length")
+
     length_diff = abs(len(mut_seq) - len(wt_seq))
     if len(wt_seq) > len(mut_seq):
         indel_type = 0 # This means deletion
