@@ -1,6 +1,6 @@
 The Data folder include generated datasets in .csv format
 
-### Indels: 7500 indels curated from three publications. 
+### Indels.csv: 7500 indels curated from three publications. 
 * id: Unique identifier for each indel
 * reference: The protein or transcript ID 
 * indel_type: Insertion or deletion
@@ -13,7 +13,7 @@ The Data folder include generated datasets in .csv format
 * MutPred-Indel: Predictions from MutPred-Indel
 
 
-### scores_(ESM1b, ESM1v, ESM2_3b/150M/650M/650M_masked, ESM3, ProtBert): zero-shot inference scores per PLM. All files conatins
+### scores_(ESM1b, ESM1v, ESM2_3b/150M/650M/650M_masked, ESM3, ProtBert).csv: zero-shot inference scores per PLM.
 * id: Unique identifier for each indel, matching Indels.csv
 * Brandes_wt: Brandes score for wt sequence
 * Brandes_mut: Brandes score for mut sequence
@@ -27,7 +27,7 @@ The Data folder include generated datasets in .csv format
 * mut_seq: mutated sequence (cut if native sequence is longer than 1022 amino acid)
 
 
-### Train: Training dataset contains 5960 indels (Indetical columns as in Indels.csv)
-### Val: Validation dataset contains 819 indels (Indetical columns as in Indels.csv)
-### Test: Test dataset contains 721 indels (Indetical columns as in Indels.csv)
+### train.csv: Training dataset contains 5960 indels (Indetical columns as in Indels.csv)
+### val.csv: Validation dataset contains 819 indels (Indetical columns as in Indels.csv)
+### test.csv: Test dataset contains 721 indels (Indetical columns as in Indels.csv)
     
