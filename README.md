@@ -1,20 +1,20 @@
 # IndeLLM
-Welcome to IndeLLM, an easy and free to use indel pathogenicity predictor based on Protein Language Models.
+Welcome to IndeLLM, an easy and free-to-use indel pathogenicity predictor based on Protein Language Models.
 
-IndeLLM also provides per position protein fitness damage score to aid in interpreting the provided predictions. 
+IndeLLM also provides a per-position protein fitness damage score to aid in interpreting the provided predictions. 
 
-A plug and play google colab can be found at (to be updated)
+A plug-and-play Google Colab can be found at (to be updated)
 
-The acompaining paper can be found at (to be published)
+The accompanying paper can be found at (to be published)
 
-If you use IndeLLM please cite us as: (to be published)
+If you use IndeLLM please cite us as (to be published)
 
 ![IndeLLM graphical abstract](img/graphicalabstract.png)
 
 ## Installation
 
 To install IndeLLM first clone the repository.
-The needed packages can be found on requirements.txt and can be installed with:
+The required packages can be found on requirements.txt and can be installed with:
 ```
 pip3 install -r requirements.txt
 ```
@@ -22,15 +22,15 @@ To use IndeLLM as a package add the repository to your PYTHONPATH.
 
 ## Folder structure and contents
 
-*   The Analysis folder contains the data and jupyter notebooks needed to reproduce the analysis showcased in the manuscript.
+*   The Analysis folder contains the data and jupyter notebooks needed to reproduce the analysis showcased in the paper.
 
 *   The Data folder contains the csv files for all the predictions, sequences used and the train/test/validation data splits used.
 More information can be found in the README found inside the Data folder.
-*   The Examples folder contains the jupyter notebook and necessary files to reproduce the data interpretation examples showcased in the manuscript.
-*   The colab folder contains the source code for the provided google colab notebook.
+*   The Examples folder contains the jupyter notebook and the necessary files to reproduce the data interpretation examples showcased in the paper.
+*   The colab folder contains the source code for the provided Google Colab notebook.
 *   The models folder contains the trained IndeLLM siamese model.
 *   The indellm folder contains the source code for the package. The code is structured in 4 files. berteval.py handles the protein language models; model.py contains the code for the training and inference of the siamese model; scorer.py contains the code for the zero-shot scoring using protein language models; utils.py contains the code to handle and process the sequences.
-*   The folder scripts contains example scripts on how to run the different functionality of the code.
+*   The folder scripts contain example scripts on how to run the different functionality of the code.
 
 ## Abstract
 
