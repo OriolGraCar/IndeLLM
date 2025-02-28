@@ -69,6 +69,12 @@ def truncate_sequences(wtseq, mutseq):
         end_m = end + allowance
         start_w = start - allowance
         end_w = start + allowance
+
+    # avoid negative indexes
+    if start_w < 0:
+        start_w = 0
+    if start_m < 0:
+        start_m = 0
             
     wtseq = wtseq[start_w:end_w]
     mutseq = mutseq[start_m:end_m]
