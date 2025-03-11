@@ -337,7 +337,7 @@ class Indellm:
         Detect the available device (CUDA, MPS, or CPU) and print its details.
         :return: The detected device.
         """
-        if torch.cuda.is_available() and 1==2:
+        if torch.cuda.is_available():
             self.device = torch.device("cuda")
             print(f"There are {torch.cuda.device_count()} GPU(s) available.")
             print("Device name:", torch.cuda.get_device_name(0))
