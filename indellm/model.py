@@ -259,6 +259,7 @@ class DataProcessor:
         
         torch.save(final_result,final_location) 
         # print(f"Embedding Saved at:{self.embedding_path}\n")
+        return final_result
 
 
 class MLPClassifier_LeakyReLu(nn.Module):
@@ -312,10 +313,28 @@ class Indellm:
     def disable_tqdm(self):
         self.tqdm_status = True
 
-    @staticmethod
-    def unpickler(dataset_path):
+    
+    def process_embbedings_df(self, emb_df):
 
-        pt_embeds = torch.load(dataset_path)
+        data_X = np.array(emb_df['x'])
+        # Compute max and min
+        # rows_with_nan = np.where(np.isnan(data_X).any(axis=1))[0]
+
+        # print("Row indices with NaN values:", rows_with_nan)
+        lens = np.array(emb_df['lengths']).reshape(-1, 1)
+        indel_type = np.array(emb_df['type']).reshape(-1, 1)
+        data_y = emb_df['label']
+        unique_id = emb_df['id']
+
+        data_X = np.hstack((data_X, lens))
+        data_X = np.hstack((data_X,indel_type))
+
+        return data_X, data_y, unique_id
+
+
+    def unpickler(self, dataset_path):
+        pt_embeds = torch.load(dataset_path, weights_only=False)
+        """
         data_X = np.array(pt_embeds['x'])
         # Compute max and min
         # rows_with_nan = np.where(np.isnan(data_X).any(axis=1))[0]
@@ -328,10 +347,12 @@ class Indellm:
 
         data_X = np.hstack((data_X, lens))
         data_X = np.hstack((data_X,indel_type))
+        """
+        data_X, data_y, unique_id = self.process_embbedings_df(pt_embeds)
 
         return data_X, data_y, unique_id
     
-
+    
     def _init_device(self):
         """
         Detect the available device (CUDA, MPS, or CPU) and print its details.
@@ -572,10 +593,10 @@ class Indellm:
         d = DataProcessor(plm_name, embedding_path, 42) 
         d.set_data(target_df)
         d.set_data_name(data_name)
-        d.extract_embeddings()
-        embedding_location = os.path.join(embedding_path, f"{data_name}_embedding.pt")
+        embeds = d.extract_embeddings()
+        #embedding_location = os.path.join(embedding_path, f"{data_name}_embedding.pt")
 
-        x_target, y_target, record_id = self.unpickler(embedding_location)
+        x_target, y_target, record_id = self.process_embbedings_df(embeds)
         #print('X_target shape: ', x_target.shape)
 
         target_dataset = ModelData(x_target, y_target)
