@@ -6,7 +6,7 @@ import os
 def main(args):
     
     # Arguments to use
-    model = args.model
+    model_path = args.model
     plm_name = args.plm
     embedding_path = args.embd_path
     output_path = args.out_path
@@ -23,7 +23,7 @@ def main(args):
     m = model.Indellm() 
     if disable_tqdm:
         m.disable_tqdm()
-    m.run(csv_data, model, plm_name, embedding_path, output_path, output_name, threshold)
+    m.run(csv_data, model_path, plm_name, embedding_path, output_path, output_name, threshold)
     
     print("Predictions Finished")
 

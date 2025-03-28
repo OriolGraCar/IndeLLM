@@ -588,7 +588,10 @@ class Indellm:
             print('No model found')
 
         checkpoint=torch.load(model_location)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        try:
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+        except:
+            self.model.load_state_dict(checkpoint)
 
         self._predict(target_loader, record_id, train=False, output_path=output_path, output_name=output_name, threshold=threshold)
 
