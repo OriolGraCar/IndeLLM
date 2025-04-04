@@ -3,7 +3,10 @@ Welcome to IndeLLM, an easy and free-to-use indel pathogenicity predictor based 
 
 IndeLLM also provides a per-position protein fitness damage score to aid in interpreting the provided predictions. 
 
-A plug-and-play Google Colab can be found at [Colab Notebook](https://colab.research.google.com/drive/1CgwprttaNFR_KeJGyFzP0a0C9Y__wc4P)
+A plug-and-play Google Colab can be found at:
+
+[![Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/OriolGraCar/IndeLLM/blob/main/IndeLLM.ipynb)
+
 
 The accompanying paper can be found at [BioRxiv Manuscript](https://www.biorxiv.org/content/10.1101/2025.03.12.642715v1)
 
