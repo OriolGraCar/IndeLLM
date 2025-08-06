@@ -21,3 +21,12 @@ The Analysis folder includes an analysis notebook and subsetted datasets.
 ### siamese_m4_(alldata/test/train/val).csv: 
 * Scores from all replicates and mean from Siamese Model 4 for all ids (matching the ids in Data/Indels.csv). We have split the id into test, train and validation datasets. 
 
+### holout.csv 1695 indels curated from ProteinGym
+* reference: The protein or transcript ID 
+* indel_type: insertion or deletion
+* Classification: Benign or Pathogenic 
+* Label: Binary label of classification, 1 is Pathogenic and 0 is Benign
+* Subset: ProteinGym split by ClinVar or GnomAD
+* wt_seq: wildtype sequence (cut if the native sequence is longer than 1022 amino acid)
+* mut_seq: mutated sequence (cut if the native sequence is longer than 1022 amino acid)
+* chromosome: the chromosome location of the translating gene
