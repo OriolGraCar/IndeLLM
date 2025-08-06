@@ -11,6 +11,7 @@ The Data folder includes generated datasets in .csv format.
 * mut_seq: mutated sequence (cut if the native sequence is longer than 1022 amino acid)
 * Provean: Predictions from Provean 
 * MutPred-Indel: Predictions from MutPred-Indel
+* chromosome: the chromosome location of the translating gene
 
 
 ### scores_(ESM1b, ESM1v, ESM2_3b/150M/650M/650M_masked, ESM3, ProtBert).csv: zero-shot inference scores per PLM.
