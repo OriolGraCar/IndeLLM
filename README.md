@@ -8,7 +8,7 @@ A plug-and-play Google Colab can be found at:
 [![Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/OriolGraCar/IndeLLM/blob/main/IndeLLM.ipynb)
 
 
-The accompanying paper can be found at [BioRxiv Manuscript](https://www.biorxiv.org/content/10.1101/2025.03.12.642715v1)
+The accompanying paper can be found at [Manuscript](https://doi.org/10.1016/j.patter.2025.101425)
 
 If you use IndeLLM please cite us.
 
